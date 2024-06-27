@@ -1,0 +1,55 @@
+services:
+
+  # api:
+  #   container_name: aspnet.webapi
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - 5001:5001
+  #   expose:
+  #     - 5001
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #   restart: unless-stopped
+  #   networks:
+  #     - aspnetwebapi
+
+  database:
+    container_name: postgres_container
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: test_db
+    ports:
+      - 5432:5432
+    expose:
+      - 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  adminer:
+    container_name: adminer_container
+    image: adminer
+    restart: always
+    ports:
+      - 8123:8080
+
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    depends_on:
+      - database
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user@localhost.com
+      PGADMIN_DEFAULT_PASSWORD: password
+    ports:
+      - 8124:80
+    volumes:
+      - ./data/pgadmin:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
