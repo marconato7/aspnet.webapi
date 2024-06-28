@@ -1,15 +1,11 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
 using aspnet.webapi.Entities;
 
 namespace aspnet.webapi.Data;
 
-// public class ApplicationDbContext : DbContext
-public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<IdentityUser>(options)
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
-    public DbSet<Entity> Entities { get; set; }
-    // public DbSet<User> Users { get; set; }
+    public DbSet<User> Users { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         => optionsBuilder.UseInMemoryDatabase("aspnet.webapi.database");

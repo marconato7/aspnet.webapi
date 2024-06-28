@@ -69,3 +69,15 @@
 //         await context.SaveChangesAsync();
 //     }
 // }
+
+// await using var ctx = new ApplicationDbContext();
+// await ctx.Database.EnsureDeletedAsync();
+// await ctx.Database.EnsureCreatedAsync();
+// ctx.Set<Entity>().Add(new() { Name = "FooEntity" });
+// await ctx.SaveChangesAsync();
+// var entities = await ctx.Set<Entity>().Where(e => e.Name.StartsWith('F')).ToListAsync();
+// return Enumerable.Range(1, 5).Select(index => new Entity
+// {
+//     Name = index.ToString(),
+// })
+// .ToArray();

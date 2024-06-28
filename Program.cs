@@ -4,6 +4,7 @@
 
 using System.Text;
 using aspnet.webapi.Data;
+using aspnet.webapi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -18,52 +19,49 @@ var builder = WebApplication.CreateBuilder(args);
     })
     .AddJwtBearer(x =>
     {
+        x.RequireHttpsMetadata = false;
+        x.SaveToken = true;
         x.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidIssuer = builder.Configuration.GetSection("JwtSettings:Issuer").Value,
-            ValidAudience = builder.Configuration.GetSection("JwtSettings:Audience").Value,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("JwtSettings:Key").Value!)),
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
+            ValidateAudience = false,
+            ValidateIssuer = false,
             ValidateIssuerSigningKey = true,
         };
     });
 
     builder.Services.AddAuthorization();
 
-    // builder.Services
-    //     .AddIdentityApiEndpoints<IdentityUser>()
-    //     .AddEntityFrameworkStores<ApplicationDbContext>();
+    // builder.Services.AddAuthorization(options =>
+    // {
+    //     options.AddPolicy("NOME_DA_POLICY", x => x.RequireRole("ROLE_OBRIGATORIO"));
+    //     options.AddPolicy("Administrador", x => x.RequireRole("admin"));
+    //     options.AddPolicy("Funcionario", x => x.RequireRole("employee"));
+    // });
 
     builder.Services.AddDbContext<ApplicationDbContext>();
+
     // builder.Services.AddDbContext<ApplicationDbContext>(options =>
     // {
     //     options.UseInMemoryDatabase("aspnet.webapi.database");
     // });
-}
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-// builder.Services.AddEndpointsApiExplorer();
-// builder.Services.AddSwaggerGen();
+    builder.Services.AddControllers();
+
+    builder.Services.AddTransient<TokenService>();
+}
 
 var app = builder.Build();
 {
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
-        // app.UseSwagger();
-        // app.UseSwaggerUI();
     }
 
-    // app.MapIdentityApi<IdentityUser>();
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.UseHttpsRedirection();
-
-    app.UseAuthorization();
-
-    app.UseAuthorization();
 
     app.MapControllers();
 }
