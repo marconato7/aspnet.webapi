@@ -1,7 +1,9 @@
 using aspnet.webapi.Data;
 using aspnet.webapi.Entities;
+using aspnet.webapi.Models;
 using aspnet.webapi.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace aspnet.webapi.Controllers;
@@ -19,8 +21,19 @@ public class ApplicationController(ILogger<ApplicationController> logger, TokenS
     // var userName = User.Identity?.Name;
     // var naem = User.Identity?.Name ?? string.Empty;
 
+    // Example request body:
+    // {
+    // "user":{
+    //     "username": "Jacob",
+    //     "email": "jake@jake.jake",
+    //     "password": "jakejake"
+    // }
+    // }
+    
+    // Returns a User
+    // Required fields: email, username, password
     [HttpPost]
-    [Route("registration")]
+    [Route("users")]
     [AllowAnonymous]
     public ActionResult<RegistrationResponse> Registration([FromBody] RegistrationRequest request)
     {
@@ -36,7 +49,7 @@ public class ApplicationController(ILogger<ApplicationController> logger, TokenS
     [HttpPost]
     [Route("authentication")]
     [AllowAnonymous]
-    public ActionResult<AuthenticationResponse> Authentication([FromBody] AuthenticationRequest request)
+    public ActionResult<UserResponse> Authentication([FromBody] AuthenticationRequest request)
     {
         if (request.Username != _user.Username)
         {
@@ -50,6 +63,6 @@ public class ApplicationController(ILogger<ApplicationController> logger, TokenS
 
         string jwt = _tokenService.Generate(_user);
 
-        return Ok(jwt);
+        return Ok();
     }
 }
