@@ -1,68 +1,182 @@
+using System.Security.Claims;
+using aspnet.webapi.Commands;
 using aspnet.webapi.Data;
 using aspnet.webapi.Entities;
 using aspnet.webapi.Models;
-using aspnet.webapi.Services;
+using aspnet.webapi.Queries;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace aspnet.webapi.Controllers;
 
 [ApiController]
 [Route("api")]
-public class ApplicationController(ILogger<ApplicationController> logger, TokenService tokenService, ApplicationDbContext context) : ControllerBase
+public class ApplicationController(IMediator mediator, ApplicationDbContext context) : ControllerBase
 {
-    private readonly static User _user = new();
-    private readonly ILogger<ApplicationController> _logger = logger;
-    private readonly TokenService _tokenService = tokenService;
     private readonly ApplicationDbContext _context = context;
-
+    private readonly IMediator _mediator = mediator;
     // var premiumUser = User.IsInRole("premium");
     // var userName = User.Identity?.Name;
     // var naem = User.Identity?.Name ?? string.Empty;
+    // var isAuthenticated = User.Identity?.IsAuthenticated;
+    // var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
 
-    // Example request body:
-    // {
-    // "user":{
-    //     "username": "Jacob",
-    //     "email": "jake@jake.jake",
-    //     "password": "jakejake"
-    // }
-    // }
-    
-    // Returns a User
-    // Required fields: email, username, password
     [HttpPost]
-    [Route("users")]
+    [Route("users/login")]
     [AllowAnonymous]
-    public ActionResult<RegistrationResponse> Registration([FromBody] RegistrationRequest request)
+    public async Task<ActionResult<UserResponse>> Authentication([FromBody] AuthenticationRequest request)
     {
-        string hash = BCrypt.Net.BCrypt.HashPassword(request.Password, 12);
+        var command = new AuthenticationCommand
+        {
+            Email = request.User.Email,
+            Password = request.User.Password,
+        };
 
-        _user.Email = request.Email;
-        _user.Password = hash;
-        _user.Username = request.Username;
+        var response = await _mediator.Send(command);
+        if (response is null)
+        {
+            return BadRequest();
+        }
 
-        return Ok(_user);
+        var userResponse = new UserResponse
+        {
+            User = new UserResponseProps
+            {
+                Username = response.User.Username,
+                Email = response.User.Email,
+                Token = response.Token,
+                Bio = response.User.Bio,
+                Image = response.User.Image,
+            },
+        };
+
+        return Ok(userResponse);
     }
 
     [HttpPost]
-    [Route("authentication")]
+    [Route("users")]
     [AllowAnonymous]
-    public ActionResult<UserResponse> Authentication([FromBody] AuthenticationRequest request)
+    public async Task<ActionResult<UserResponse>> Registration([FromBody] RegistrationRequest request)
     {
-        if (request.Username != _user.Username)
+        var command = new RegistrationCommand
         {
-            return BadRequest("invalid credentials");
+            Username = request.User.Username,
+            Email = request.User.Email,
+            Password = request.User.Password,
+        };
+
+        var response = await _mediator.Send(command);
+        if (response is null)
+        {
+            return BadRequest();
         }
 
-        if (!BCrypt.Net.BCrypt.Verify(request.Password, _user.Password))
+        var userResponse = new UserResponse
         {
-            return BadRequest("invalid credentials");
+            User = new UserResponseProps
+            {
+                Username = response.User.Username,
+                Email = response.User.Email,
+                Token = response.Token,
+                Bio = response.User.Bio,
+                Image = response.User.Image,
+            },
+        };
+
+        return Created(nameof(Registration), userResponse);
+    }
+
+    [HttpPost]
+    [Route("articles")]
+    [Authorize]
+    public async Task<ActionResult<ArticleResponse>> CreateArticle([FromBody] CreateArticleRequest request)
+    {
+        var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+
+        var command = new CreateArticleCommand
+        {
+            UserEmail = userEmail!,
+            Title = request.Article.Title,
+            Description = request.Article.Description,
+            Body = request.Article.Body,
+            TagList = request.Article.TagList,
+        };
+
+        var response = await _mediator.Send(command);
+        if (response is null)
+        {
+            return BadRequest();
         }
 
-        string jwt = _tokenService.Generate(_user);
+        ArticleResponse articleResponse = ToArticleResponse(response);
 
-        return Ok();
+        return Created(nameof(CreateArticle), articleResponse);
+    }
+
+    [HttpGet]
+    [Route("users")]
+    [AllowAnonymous]
+    public async Task<ActionResult> Users(CancellationToken cancellationToken)
+    {
+        return Ok(await _context.Set<UserEntity>().Include(u => u.Articles).ToListAsync(cancellationToken));
+    }
+
+    [HttpGet]
+    [Route("articles/{slug}")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ArticleResponse>> GetArticle([FromRoute] string slug, CancellationToken cancellationToken)
+    {
+        var command = new GetArticleQuery
+        {
+            Slug = slug,
+        };
+
+        var response = await _mediator.Send(command);
+        if (response is null)
+        {
+            return BadRequest();
+        }
+
+        ArticleResponse articleResponse = ToArticleResponse(response);
+
+        return Ok(articleResponse);
+    }
+
+    [HttpGet]
+    [Route("tags")]
+    [AllowAnonymous]
+    public async Task<ActionResult<object>> GetTags(CancellationToken cancellationToken)
+    {
+        var query = new GetTagsQuery();
+
+        var response = await _mediator.Send(query, cancellationToken);
+        if (response is null)
+        {
+            return BadRequest();
+        }
+
+        var articleResponse = new ListofTags
+        {
+            Tags = response.Tags.Select(t => t.Name).ToArray(),
+        };
+
+        return Ok(articleResponse);
+    }
+
+    private static ArticleResponse ToArticleResponse(ArticleDto response)
+    {
+        return new ArticleResponse
+        {
+            Article = new ArticleResponseProps
+            {
+                Slug = response.Article.Slug,
+                Title = response.Article.Title,
+                Description = response.Article.Description,
+                Body = response.Article.Body,
+                TagList = response.Article.Tags?.Select(t => t.Name).ToArray(),
+            },
+        };
     }
 }

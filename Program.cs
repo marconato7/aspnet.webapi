@@ -7,23 +7,33 @@ using aspnet.webapi.Data;
 using aspnet.webapi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
+using aspnet.webapi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
+var connectionString = builder.Configuration.GetConnectionString("IdentityDataContextConnection") ?? throw new InvalidOperationException("Connection string 'IdentityDataContextConnection' not found.");
 {
     // Add services to the container.
-    builder.Services.AddAuthentication(x =>
+    builder.Services.AddMediatR(cfg =>
     {
-        x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        x.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+        cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    });
+
+    builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.Jwt));
+
+    builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
     })
-    .AddJwtBearer(x =>
+    .AddJwtBearer(options =>
     {
-        x.RequireHttpsMetadata = false;
-        x.SaveToken = true;
-        x.TokenValidationParameters = new TokenValidationParameters
+        options.RequireHttpsMetadata = false;
+        options.SaveToken = true;
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("JwtSettings:Key").Value!)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration.GetSection("Jwt:Key").Value!)),
             ValidateAudience = false,
             ValidateIssuer = false,
             ValidateIssuerSigningKey = true,
@@ -39,6 +49,8 @@ var builder = WebApplication.CreateBuilder(args);
     //     options.AddPolicy("Funcionario", x => x.RequireRole("employee"));
     // });
 
+    // builder.Services.AddDefaultIdentity();
+
     builder.Services.AddDbContext<ApplicationDbContext>();
 
     // builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -49,6 +61,7 @@ var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddControllers();
 
     builder.Services.AddTransient<TokenService>();
+    // builder.Services.AddTransient<IdentityService>();
 }
 
 var app = builder.Build();
@@ -61,7 +74,7 @@ var app = builder.Build();
     app.UseAuthentication();
     app.UseAuthorization();
 
-    app.UseHttpsRedirection();
+    // app.UseHttpsRedirection();
 
     app.MapControllers();
 }

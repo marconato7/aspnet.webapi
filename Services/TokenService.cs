@@ -2,62 +2,60 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using aspnet.webapi.Entities;
+using aspnet.webapi.Models;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace aspnet.webapi.Services;
 
-public class TokenService(IConfiguration configuration)
+public class TokenService(IOptions<JwtOptions> jwtOptions)
 {
-    private readonly IConfiguration _configuration = configuration;
+    private readonly JwtOptions _jwtOptions = jwtOptions.Value;
 
-    public string Generate(User user)
+    public string Generate(UserEntity user)
     {
-        var stringKeyFromSettings = _configuration.GetSection("JwtSettings:Key").Value!;
+        var symmetricSecurityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.Key));
 
-        var stringKeyFromSettingsAsByteArray = Encoding.UTF8.GetBytes(stringKeyFromSettings);
-
-        var key = new SymmetricSecurityKey(stringKeyFromSettingsAsByteArray);
-
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
+        var signingCredentials = new SigningCredentials(symmetricSecurityKey, SecurityAlgorithms.HmacSha256Signature);
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Audience = _configuration.GetSection("JwtSettings:Audience").Value!,
-            Expires = DateTime.UtcNow.AddMinutes(5),
-            Issuer = _configuration.GetSection("JwtSettings:Issuer").Value!,
-            SigningCredentials = credentials,
+            SigningCredentials = signingCredentials,
             Subject = GenerateClaims(user),
         };
 
-        var handler = new JwtSecurityTokenHandler();
+        var jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
 
-        var token = handler.CreateToken(tokenDescriptor);
+        var jwtSecurityToken = jwtSecurityTokenHandler.CreateToken(tokenDescriptor);
 
-        var jwt = handler.WriteToken(token);
+        var jwt = jwtSecurityTokenHandler.WriteToken(jwtSecurityToken);
 
         return jwt;
     }
 
-    private static ClaimsIdentity GenerateClaims(User user)
+    private ClaimsIdentity GenerateClaims(UserEntity user)
     {
         var claimsIdentity = new ClaimsIdentity();
 
-        claimsIdentity.AddClaim(new Claim(ClaimTypes.Name, user.Username));
-        claimsIdentity.AddClaim(new Claim(ClaimTypes.Email, user.Email));
+        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Iss, _jwtOptions.Issuer));
+        // claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()));
+        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Aud, _jwtOptions.Audience));
+        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Exp, DateTime.UtcNow.AddMinutes(_jwtOptions.ExpiresInMinutes).ToString()));
+        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Nbf, DateTime.Now.ToString()));
+        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Iat, DateTime.Now.ToString()));
         claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()));
-        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Sub, user.Email));
-        claimsIdentity.AddClaim(new Claim(JwtRegisteredClaimNames.Email, user.Email));
-        // claimsIdentity.AddClaim(new Claim("userId", user.Id.ToString()));
 
-        if(user.Roles.IsNullOrEmpty())
-        {
-            return claimsIdentity;
-        }
+        claimsIdentity.AddClaim(new Claim(ClaimTypes.Email, user.Email));
+
+        // if(user.Roles.IsNullOrEmpty())
+        // {
+        //     return claimsIdentity;
+        // }
         
-        foreach (var role in user.Roles)
-        {
-            claimsIdentity.AddClaim(new Claim(ClaimTypes.Role, role));
-        }
+        // foreach (var role in user.Roles)
+        // {
+        //     claimsIdentity.AddClaim(new Claim(ClaimTypes.Role, role));
+        // }
 
         return claimsIdentity;
     }
