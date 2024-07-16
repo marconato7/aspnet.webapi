@@ -133,7 +133,7 @@ public class ApplicationController(IMediator mediator, ApplicationDbContext cont
             Slug = slug,
         };
 
-        var response = await _mediator.Send(command);
+        var response = await _mediator.Send(command, cancellationToken);
         if (response is null)
         {
             return BadRequest();

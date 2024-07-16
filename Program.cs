@@ -7,21 +7,25 @@ using aspnet.webapi.Data;
 using aspnet.webapi.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.EntityFrameworkCore;
 using aspnet.webapi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
-var connectionString = builder.Configuration.GetConnectionString("IdentityDataContextConnection") ?? throw new InvalidOperationException("Connection string 'IdentityDataContextConnection' not found.");
 {
     // Add services to the container.
-    builder.Services.AddMediatR(cfg =>
+    builder.Services.AddScoped<IDbConnectionFactory>(_ => new NpgsqlConnectionFactory(builder.Configuration.GetConnectionString("database")!));
+
+    builder.Services.AddStackExchangeRedisCache(options =>
     {
-        cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+        options.Configuration = builder.Configuration.GetConnectionString("MyRedisConStr");
+        options.InstanceName = "SampleInstance";
     });
+
+    builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(Program).Assembly));
 
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.Jwt));
 
-    builder.Services.AddAuthentication(options =>
+    builder.Services
+    .AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
         options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -49,19 +53,11 @@ var connectionString = builder.Configuration.GetConnectionString("IdentityDataCo
     //     options.AddPolicy("Funcionario", x => x.RequireRole("employee"));
     // });
 
-    // builder.Services.AddDefaultIdentity();
-
     builder.Services.AddDbContext<ApplicationDbContext>();
-
-    // builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    // {
-    //     options.UseInMemoryDatabase("aspnet.webapi.database");
-    // });
 
     builder.Services.AddControllers();
 
     builder.Services.AddTransient<TokenService>();
-    // builder.Services.AddTransient<IdentityService>();
 }
 
 var app = builder.Build();
@@ -72,9 +68,10 @@ var app = builder.Build();
     }
 
     app.UseAuthentication();
+
     app.UseAuthorization();
 
-    // app.UseHttpsRedirection();
+    app.UseHttpsRedirection();
 
     app.MapControllers();
 }
